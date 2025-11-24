@@ -11,9 +11,14 @@ import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Home() {
-  const { memories, activeMemoryId, addMemory, setActiveMemory } = useMemoryStore();
+  const { memories, activeMemoryId, addMemory, setActiveMemory, loadMemories } = useMemoryStore();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load memories from database on mount
+  useEffect(() => {
+    loadMemories();
+  }, [loadMemories]);
 
   // Get active memory object
   const activeMemory = memories.find(m => m.id === activeMemoryId) || memories[0] || null;
@@ -89,39 +94,25 @@ export default function Home() {
       const formData = new FormData();
       formData.append('file', file);
 
-      // Parallelize Supabase upload and AI analysis
-      const uploadPromise = (async () => {
-        const filename = `uploads/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-        const { error } = await supabase.storage
-          .from('images')
-          .upload(filename, file);
+      // Upload to Supabase
+      const filename = `uploads/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      const { error } = await supabase.storage
+        .from('images')
+        .upload(filename, file);
 
-        if (error) throw error;
-        
-        const { data: { publicUrl } } = supabase.storage
-          .from('images')
-          .getPublicUrl(filename);
-          
-        return publicUrl;
-      })();
+      if (error) throw error;
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('images')
+        .getPublicUrl(filename);
 
-      const analysisPromise = fetch('/api/analyze', {
-        method: 'POST',
-        body: formData,
-      }).then(r => r.json());
-
-      const [publicUrl, analysis] = await Promise.all([uploadPromise, analysisPromise]);
-
-      // Create Memory
-      const newMemory = {
-        id: Date.now().toString(),
+      // Create Memory with simple defaults and save to database
+      await addMemory({
         imageUrl: publicUrl,
-        title: analysis.title,
-        description: analysis.description,
-        date: analysis.date,
-      };
+        title: 'Eternal Moment',
+        description: 'A beautiful memory captured in time, preserved forever in the digital garden.',
+      });
 
-      addMemory(newMemory);
       setIsAnalyzing(false);
     } catch (error) {
       console.error('Upload failed', error);
@@ -180,7 +171,7 @@ export default function Home() {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                   </span>
-                  <span className="text-[10px] uppercase tracking-widest text-green-400 font-medium">Gemini Memory</span>
+                  <span className="text-[10px] uppercase tracking-widest text-green-400 font-medium">Memory</span>
                 </div>
 
                 <h2 className="text-4xl md:text-5xl font-thin tracking-tight mb-4 text-white text-glow">
@@ -241,7 +232,7 @@ export default function Home() {
              <div className="text-center">
                 <Loader2 className="w-10 h-10 text-green-400 animate-spin mx-auto mb-4" />
                 <p className="text-green-400 text-xs tracking-[0.2em] uppercase animate-pulse">
-                  Gemini is dreaming...
+                  Processing...
                 </p>
              </div>
           </motion.div>

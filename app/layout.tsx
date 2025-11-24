@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sara & Yuchen's AI Garden",
-  description: "A 3D memory garden powered by Gemini",
+  title: "Sara & Yuchen's Memory Garden",
+  description: "A 3D memory garden preserving precious moments",
 };
 
 export default function RootLayout({

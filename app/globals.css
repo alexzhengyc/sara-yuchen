@@ -4,7 +4,7 @@
   /* Dark theme by default */
   --background: #000000;
   --foreground: #ededed;
-  --accent: #4ade80; /* Green for Gemini */
+  --accent: #4ade80; /* Green accent color */
 }
 
 @theme inline {
