@@ -321,7 +321,7 @@ export default function Home() {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.6, ease: 'easeInOut' }}
-                  className="max-w-[90%] max-h-[65vh] md:max-h-[70vh] object-contain pointer-events-none"
+                  className="h-[60vh] w-auto object-contain pointer-events-none"
                 />
               </motion.div>
 
