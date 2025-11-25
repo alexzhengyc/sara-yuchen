@@ -17,6 +17,7 @@ export default function Home() {
   const [imagePreview, setImagePreview] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [direction, setDirection] = useState(0); // -1 for prev, 1 for next
+  const timelineRef = useRef<HTMLDivElement>(null);
 
   // Load memories from database on mount
   useEffect(() => {
@@ -216,6 +217,22 @@ export default function Home() {
     }
   };
 
+  // Auto-scroll timeline to center active thumbnail
+  useEffect(() => {
+    if (timelineRef.current && memories.length > 1) {
+      const timeline = timelineRef.current;
+      const activeIndex = currentIndex;
+      // Each thumbnail is approximately 64px (16 * 4) + 16px gap = 80px
+      const thumbnailWidth = 80;
+      const scrollPosition = activeIndex * thumbnailWidth - (timeline.clientWidth / 2) + (thumbnailWidth / 2);
+      
+      timeline.scrollTo({
+        left: scrollPosition,
+        behavior: 'smooth',
+      });
+    }
+  }, [activeMemoryId, currentIndex, memories.length]);
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -289,33 +306,14 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Three-Photo Carousel with Drag Support */}
+              {/* Main Image with Drag Support */}
               <motion.div 
-                className="flex items-center justify-center gap-4 w-full mb-6 cursor-grab active:cursor-grabbing"
+                className="w-full flex justify-center mb-6 cursor-grab active:cursor-grabbing"
                 drag="x"
                 dragConstraints={{ left: 0, right: 0 }}
                 dragElastic={0.2}
                 onDragEnd={handleDragEnd}
               >
-                {/* Previous Photo Thumbnail */}
-                {currentIndex > 0 && memories[currentIndex - 1] && (
-                  <motion.div
-                    initial={{ opacity: 0, x: -50 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -50 }}
-                    transition={{ duration: 0.4 }}
-                    className="max-w-[20%] cursor-pointer group"
-                    onClick={handlePrev}
-                  >
-                    <img
-                      src={memories[currentIndex - 1].imageUrl}
-                      alt={memories[currentIndex - 1].title}
-                      className="w-full max-h-[30vh] object-contain opacity-40 group-hover:opacity-70 transition-opacity duration-300 pointer-events-none"
-                    />
-                  </motion.div>
-                )}
-
-                {/* Main Image */}
                 <motion.img
                   src={activeMemory.imageUrl}
                   alt={activeMemory.title}
@@ -323,34 +321,64 @@ export default function Home() {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.6, ease: 'easeInOut' }}
-                  className="max-w-[50%] max-h-[50vh] object-contain pointer-events-none"
+                  className="max-w-[90%] max-h-[65vh] md:max-h-[70vh] object-contain pointer-events-none"
                 />
-
-                {/* Next Photo Thumbnail */}
-                {currentIndex < memories.length - 1 && memories[currentIndex + 1] && (
-                  <motion.div
-                    initial={{ opacity: 0, x: 50 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 50 }}
-                    transition={{ duration: 0.4 }}
-                    className="max-w-[20%] cursor-pointer group"
-                    onClick={handleNext}
-                  >
-                    <img
-                      src={memories[currentIndex + 1].imageUrl}
-                      alt={memories[currentIndex + 1].title}
-                      className="w-full max-h-[30vh] object-contain opacity-40 group-hover:opacity-70 transition-opacity duration-300 pointer-events-none"
-                    />
-                  </motion.div>
-                )}
               </motion.div>
 
               {/* Description below image */}
-              <div className="text-center max-w-2xl">
+              <div className="text-center max-w-2xl mb-8">
                 <p className="text-sm md:text-base text-white/70 font-light leading-relaxed">
                   {activeMemory.description}
                 </p>
               </div>
+
+              {/* Timeline Thumbnails */}
+              {memories.length > 1 && (
+                <div className="w-full max-w-6xl">
+                  <div 
+                    ref={timelineRef}
+                    className="flex justify-center gap-4 overflow-x-auto pb-4 px-4 scrollbar-hide"
+                    style={{
+                      scrollbarWidth: 'none',
+                      msOverflowStyle: 'none',
+                    }}
+                  >
+                    {memories.map((memory, index) => (
+                      <motion.div
+                        key={memory.id}
+                        className={`shrink-0 cursor-pointer transition-all duration-300 ${
+                          memory.id === activeMemory.id ? 'scale-110' : 'scale-100 opacity-60 hover:opacity-100'
+                        }`}
+                        onClick={() => {
+                          setDirection(index > currentIndex ? 1 : -1);
+                          setActiveMemory(memory.id);
+                        }}
+                        whileHover={{ scale: memory.id === activeMemory.id ? 1.1 : 1.05 }}
+                      >
+                        <div className="relative">
+                          <img
+                            src={memory.imageUrl}
+                            alt={memory.title}
+                            className={`h-16 w-16 object-cover rounded-lg ${
+                              memory.id === activeMemory.id 
+                                ? 'ring-2 ring-white shadow-lg shadow-white/20' 
+                                : 'ring-1 ring-white/20'
+                            }`}
+                          />
+                          <div className="mt-1 text-center">
+                            <p className="text-xs text-white/50 truncate w-16">
+                              {new Date(memory.date).toLocaleDateString('en-US', { 
+                                month: 'short', 
+                                day: 'numeric' 
+                              })}
+                            </p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </motion.div>
           ) : (
             <motion.div 

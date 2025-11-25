@@ -35,4 +35,13 @@ body {
   .accent-glow {
     box-shadow: 0 0 15px rgba(74, 222, 128, 0.3);
   }
+  
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
