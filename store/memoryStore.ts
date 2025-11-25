@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { fetchMemories, insertMemory, deleteMemory, DbMemory } from '@/lib/memoryDb';
+import { fetchMemories, insertMemory, updateMemory, deleteMemory, DbMemory } from '@/lib/memoryDb';
 
 export interface Memory {
   id: string;
@@ -14,7 +14,8 @@ interface MemoryState {
   activeMemoryId: string | null;
   isLoading: boolean;
   loadMemories: () => Promise<void>;
-  addMemory: (memory: Omit<Memory, 'id' | 'date'>) => Promise<Memory | null>;
+  addMemory: (memory: Omit<Memory, 'id'>) => Promise<Memory | null>;
+  updateMemory: (id: string, updates: Partial<Omit<Memory, 'id' | 'imageUrl'>>) => Promise<void>;
   setActiveMemory: (id: string) => void;
   removeMemory: (id: string) => Promise<void>;
 }
@@ -26,7 +27,7 @@ function dbMemoryToMemory(dbMemory: DbMemory): Memory {
     imageUrl: dbMemory.image_url,
     title: dbMemory.title,
     description: dbMemory.description,
-    date: dbMemory.created_at,
+    date: dbMemory.date,
   };
 }
 
@@ -53,6 +54,7 @@ export const useMemoryStore = create<MemoryState>()((set, get) => ({
         title: memory.title,
         description: memory.description,
         image_url: memory.imageUrl,
+        date: memory.date,
       });
       const newMemory = dbMemoryToMemory(dbMemory);
       set((state) => ({
@@ -63,6 +65,20 @@ export const useMemoryStore = create<MemoryState>()((set, get) => ({
     } catch (error) {
       console.error('Failed to add memory:', error);
       return null;
+    }
+  },
+
+  updateMemory: async (id, updates) => {
+    try {
+      const dbMemory = await updateMemory(id, updates);
+      const updatedMemory = dbMemoryToMemory(dbMemory);
+      set((state) => ({
+        memories: state.memories.map((m) =>
+          m.id === id ? updatedMemory : m
+        ),
+      }));
+    } catch (error) {
+      console.error('Failed to update memory:', error);
     }
   },
 

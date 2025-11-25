@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS memories (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   title TEXT NOT NULL,
   description TEXT,
-  image_url TEXT NOT NULL
+  image_url TEXT NOT NULL,
+  date DATE NOT NULL
 );
 
 -- Enable Row Level Security
@@ -30,4 +31,10 @@ CREATE POLICY "Allow public delete access"
 
 -- Create index on created_at for efficient sorting
 CREATE INDEX IF NOT EXISTS memories_created_at_idx ON memories(created_at DESC);
+
+-- Migration: Add date column to existing table
+-- Run this if you already have the table created:
+-- ALTER TABLE memories ADD COLUMN IF NOT EXISTS date DATE;
+-- UPDATE memories SET date = created_at::date WHERE date IS NULL;
+-- ALTER TABLE memories ALTER COLUMN date SET NOT NULL;
 

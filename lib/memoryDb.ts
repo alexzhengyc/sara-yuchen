@@ -6,6 +6,7 @@ export interface DbMemory {
   title: string;
   description: string;
   image_url: string;
+  date: string;
 }
 
 /**
@@ -15,7 +16,7 @@ export async function fetchMemories(): Promise<DbMemory[]> {
   const { data, error } = await supabase
     .from('memories')
     .select('*')
-    .order('created_at', { ascending: false });
+    .order('date', { ascending: true });
 
   if (error) {
     console.error('Error fetching memories:', error);
@@ -32,6 +33,7 @@ export async function insertMemory(memory: {
   title: string;
   description: string;
   image_url: string;
+  date: string;
 }): Promise<DbMemory> {
   const { data, error } = await supabase
     .from('memories')
@@ -41,6 +43,32 @@ export async function insertMemory(memory: {
 
   if (error) {
     console.error('Error inserting memory:', error);
+    throw error;
+  }
+
+  return data;
+}
+
+/**
+ * Update a memory in the database
+ */
+export async function updateMemory(
+  id: string,
+  updates: {
+    title?: string;
+    description?: string;
+    date?: string;
+  }
+): Promise<DbMemory> {
+  const { data, error } = await supabase
+    .from('memories')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating memory:', error);
     throw error;
   }
 

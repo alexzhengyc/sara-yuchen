@@ -2,18 +2,21 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Layout from '@/components/ui/Layout';
-import Controls from '@/components/ui/Controls';
-import Scene from '@/components/canvas/Scene';
-import ParticleImage from '@/components/canvas/ParticleImage';
+import UploadModal from '@/components/ui/UploadModal';
 import { supabase } from '@/lib/supabaseClient';
 import { useMemoryStore } from '@/store/memoryStore';
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Edit2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Home() {
-  const { memories, activeMemoryId, addMemory, setActiveMemory, loadMemories } = useMemoryStore();
+  const { memories, activeMemoryId, addMemory, updateMemory, setActiveMemory, loadMemories, removeMemory } = useMemoryStore();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [direction, setDirection] = useState(0); // -1 for prev, 1 for next
 
   // Load memories from database on mount
   useEffect(() => {
@@ -28,18 +31,58 @@ export default function Home() {
 
   const handleNext = () => {
     if (currentIndex < memories.length - 1) {
+      setDirection(1);
       setActiveMemory(memories[currentIndex + 1].id);
     }
   };
 
   const handlePrev = () => {
     if (currentIndex > 0) {
+      setDirection(-1);
       setActiveMemory(memories[currentIndex - 1].id);
     }
   };
 
+  // Handle drag/swipe gestures
+  const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: { offset: { x: number; y: number } }) => {
+    const threshold = 100; // minimum drag distance to trigger navigation
+    
+    if (info.offset.x > threshold) {
+      // Dragged right -> go to previous
+      handlePrev();
+    } else if (info.offset.x < -threshold) {
+      // Dragged left -> go to next
+      handleNext();
+    }
+  };
+
   const handleUploadTrigger = () => {
+    setModalMode('create');
     fileInputRef.current?.click();
+  };
+
+  const handleEditTrigger = () => {
+    if (!activeMemory) return;
+    setModalMode('edit');
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!activeMemory) return;
+    
+    setIsModalOpen(false);
+    setIsAnalyzing(true);
+
+    try {
+      // Delete from storage if needed
+      // Note: You may want to delete the image from Supabase storage here
+      // For now, we'll just remove from database
+      await removeMemory(activeMemory.id);
+      setIsAnalyzing(false);
+    } catch (error) {
+      console.error('Delete failed', error);
+      setIsAnalyzing(false);
+    }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -91,32 +134,85 @@ export default function Home() {
         }
       }
 
-      const formData = new FormData();
-      formData.append('file', file);
-
-      // Upload to Supabase
-      const filename = `uploads/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-      const { error } = await supabase.storage
-        .from('images')
-        .upload(filename, file);
-
-      if (error) throw error;
+      // Store the file and show modal
+      setSelectedFile(file);
       
-      const { data: { publicUrl } } = supabase.storage
-        .from('images')
-        .getPublicUrl(filename);
-
-      // Create Memory with simple defaults and save to database
-      await addMemory({
-        imageUrl: publicUrl,
-        title: 'Eternal Moment',
-        description: 'A beautiful memory captured in time, preserved forever in the digital garden.',
-      });
-
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(file);
+      setImagePreview(previewUrl);
+      
       setIsAnalyzing(false);
+      setIsModalOpen(true);
     } catch (error) {
-      console.error('Upload failed', error);
+      console.error('File processing failed', error);
       setIsAnalyzing(false);
+    }
+  };
+
+  const handleModalSubmit = async (data: { title: string; date: string; description: string }) => {
+    setIsModalOpen(false);
+
+    if (modalMode === 'edit') {
+      // Edit mode - update existing memory
+      if (!activeMemory) return;
+      
+      setIsAnalyzing(true);
+      try {
+        await updateMemory(activeMemory.id, {
+          title: data.title,
+          date: data.date,
+          description: data.description,
+        });
+        setIsAnalyzing(false);
+      } catch (error) {
+        console.error('Update failed', error);
+        setIsAnalyzing(false);
+      }
+    } else {
+      // Create mode - upload new memory
+      if (!selectedFile) return;
+
+      setIsAnalyzing(true);
+      try {
+        // Upload to Supabase
+        const filename = `uploads/${Date.now()}_${selectedFile.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+        const { error } = await supabase.storage
+          .from('images')
+          .upload(filename, selectedFile);
+
+        if (error) throw error;
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('images')
+          .getPublicUrl(filename);
+
+        // Create Memory with user-provided data and save to database
+        await addMemory({
+          imageUrl: publicUrl,
+          title: data.title,
+          description: data.description,
+          date: data.date,
+        });
+
+        setIsAnalyzing(false);
+        
+        // Clean up
+        setSelectedFile(null);
+        URL.revokeObjectURL(imagePreview);
+        setImagePreview('');
+      } catch (error) {
+        console.error('Upload failed', error);
+        setIsAnalyzing(false);
+      }
+    }
+  };
+
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    setSelectedFile(null);
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+      setImagePreview('');
     }
   };
 
@@ -132,7 +228,7 @@ export default function Home() {
   }, [currentIndex, memories.length]);
 
   return (
-    <Layout>
+    <Layout onUpload={handleUploadTrigger}>
       {/* Hidden Input */}
       <input
         type="file"
@@ -142,61 +238,139 @@ export default function Home() {
         className="hidden"
       />
 
-      {/* 3D Background */}
-      <Scene>
-        {activeMemory ? (
-          <ParticleImage key={activeMemory.id} imageUrl={activeMemory.imageUrl} />
-        ) : (
-            // Placeholder or Empty State visual could go here
-            null
-        )}
-      </Scene>
+      {/* Upload Modal */}
+      <UploadModal
+        isOpen={isModalOpen}
+        onClose={handleModalClose}
+        onSubmit={handleModalSubmit}
+        onDelete={modalMode === 'edit' ? handleDelete : undefined}
+        imagePreview={modalMode === 'create' ? imagePreview : activeMemory?.imageUrl}
+        mode={modalMode}
+        initialData={modalMode === 'edit' && activeMemory ? {
+          title: activeMemory.title,
+          date: activeMemory.date,
+          description: activeMemory.description,
+        } : undefined}
+      />
 
-      {/* UI Overlays */}
-      <div className="absolute inset-0 pointer-events-none flex flex-col justify-between z-10 p-6 pb-32">
-        
-        {/* Center/Top Info */}
-        <div className="flex-1 flex flex-col items-center justify-center">
-          <AnimatePresence mode="wait">
-            {activeMemory ? (
-              <motion.div
-                key={activeMemory.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="text-center max-w-md"
-              >
-                <div className="inline-flex items-center space-x-2 bg-green-500/10 border border-green-500/20 rounded-full px-3 py-1 mb-6 backdrop-blur-sm">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                  </span>
-                  <span className="text-[10px] uppercase tracking-widest text-green-400 font-medium">Memory</span>
+      {/* Main Content Container */}
+      <div className="absolute inset-0 w-full h-full overflow-hidden flex flex-col items-center justify-center px-6">
+        <AnimatePresence mode="wait" custom={direction}>
+          {activeMemory ? (
+            <motion.div
+              key={activeMemory.id}
+              custom={direction}
+              initial={{ opacity: 0, x: direction > 0 ? 300 : -300 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: direction > 0 ? -300 : 300 }}
+              transition={{ duration: 0.5, ease: 'easeInOut' }}
+              className="flex flex-col items-center justify-center max-w-7xl w-full"
+            >
+              {/* Date and Title above image */}
+              <div className="text-center mb-6 relative group">
+                <p className="text-xs text-white/50 mb-2 tracking-wider">
+                  {new Date(activeMemory.date).toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}
+                </p>
+                <div className="flex items-center justify-center gap-3">
+                  <h2 className="text-3xl md:text-4xl font-thin tracking-tight text-white">
+                    {activeMemory.title}
+                  </h2>
+                  <button
+                    onClick={handleEditTrigger}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-2 hover:bg-white/10 rounded-full"
+                    aria-label="Edit memory"
+                  >
+                    <Edit2 className="w-5 h-5 text-white/70 hover:text-white" />
+                  </button>
                 </div>
+              </div>
 
-                <h2 className="text-4xl md:text-5xl font-thin tracking-tight mb-4 text-white text-glow">
-                  {activeMemory.title}
-                </h2>
-                <p className="text-sm md:text-base text-white/70 font-light leading-relaxed glass-panel p-4 rounded-xl inline-block">
+              {/* Three-Photo Carousel with Drag Support */}
+              <motion.div 
+                className="flex items-center justify-center gap-4 w-full mb-6 cursor-grab active:cursor-grabbing"
+                drag="x"
+                dragConstraints={{ left: 0, right: 0 }}
+                dragElastic={0.2}
+                onDragEnd={handleDragEnd}
+              >
+                {/* Previous Photo Thumbnail */}
+                {currentIndex > 0 && memories[currentIndex - 1] && (
+                  <motion.div
+                    initial={{ opacity: 0, x: -50 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -50 }}
+                    transition={{ duration: 0.4 }}
+                    className="max-w-[20%] cursor-pointer group"
+                    onClick={handlePrev}
+                  >
+                    <img
+                      src={memories[currentIndex - 1].imageUrl}
+                      alt={memories[currentIndex - 1].title}
+                      className="w-full max-h-[30vh] object-contain opacity-40 group-hover:opacity-70 transition-opacity duration-300 pointer-events-none"
+                    />
+                  </motion.div>
+                )}
+
+                {/* Main Image */}
+                <motion.img
+                  src={activeMemory.imageUrl}
+                  alt={activeMemory.title}
+                  initial={{ opacity: 0, scale: 1.05 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.6, ease: 'easeInOut' }}
+                  className="max-w-[50%] max-h-[50vh] object-contain pointer-events-none"
+                />
+
+                {/* Next Photo Thumbnail */}
+                {currentIndex < memories.length - 1 && memories[currentIndex + 1] && (
+                  <motion.div
+                    initial={{ opacity: 0, x: 50 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 50 }}
+                    transition={{ duration: 0.4 }}
+                    className="max-w-[20%] cursor-pointer group"
+                    onClick={handleNext}
+                  >
+                    <img
+                      src={memories[currentIndex + 1].imageUrl}
+                      alt={memories[currentIndex + 1].title}
+                      className="w-full max-h-[30vh] object-contain opacity-40 group-hover:opacity-70 transition-opacity duration-300 pointer-events-none"
+                    />
+                  </motion.div>
+                )}
+              </motion.div>
+
+              {/* Description below image */}
+              <div className="text-center max-w-2xl">
+                <p className="text-sm md:text-base text-white/70 font-light leading-relaxed">
                   {activeMemory.description}
                 </p>
-              </motion.div>
-            ) : (
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-center"
-              >
-                 <h2 className="text-2xl font-thin tracking-widest text-white/50 mb-4">
-                   THE GARDEN IS EMPTY
-                 </h2>
-                 <p className="text-white/30 text-xs tracking-wider uppercase">
-                   Upload a photo to plant a memory
-                 </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-center"
+            >
+               <h2 className="text-2xl font-thin tracking-widest text-white/50 mb-4">
+                 THE GARDEN IS EMPTY
+               </h2>
+               <p className="text-white/30 text-xs tracking-wider uppercase">
+                 Upload a photo to plant a memory
+               </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* UI Overlays */}
+      <div className="absolute inset-0 pointer-events-none z-10">
 
         {/* Navigation Arrows */}
         {memories.length > 1 && (
@@ -238,8 +412,6 @@ export default function Home() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      <Controls onUpload={handleUploadTrigger} />
     </Layout>
   );
 }

@@ -53,16 +53,26 @@ const ImageParticleMaterial = shaderMaterial(
       // Calculate displacement based on brightness
       float brightness = getBrightness(vColor);
       
+      // Calculate distance from center (0.5, 0.5) - radial effect
+      float distFromCenter = distance(uv, vec2(0.5));
+      // Normalize to 0-1 range (max distance from center is ~0.707)
+      distFromCenter = distFromCenter / 0.707;
+      // Apply smoothstep starting from 0.5 (50% radius) - center 50% has almost no effect
+      float radialFactor = smoothstep(0.5, 1.0, distFromCenter);
+      // Apply power for even stronger edge effect
+      radialFactor = pow(radialFactor, 2.0);
+      
       // New position
       vec3 pos = position;
       
-      // Dispersion
-      float noise = random(uv + uTime * 0.0001); // Subtle noise changes
-      pos.x += (noise - 0.5) * uDispersion * 0.01 * (1.0 - brightness); // More dispersion in dark areas or just global
-      pos.y += (noise - 0.5) * uDispersion * 0.01;
+      // Dispersion - stronger at edges, weaker at center
+      float noise = random(uv + uTime * 0.0001);
+      pos.x += (noise - 0.5) * uDispersion * 0.01 * (1.0 - brightness) * radialFactor;
+      pos.y += (noise - 0.5) * uDispersion * 0.01 * radialFactor;
       
       // Move particles forward based on brightness (brighter = closer)
-      pos.z += brightness * uDisplacementStrength + sin(uv.x * 20.0 + uTime * uFlowSpeed) * 0.02 * uFlowAmplitude;
+      // Apply radial factor to displacement and flow effects
+      pos.z += brightness * uDisplacementStrength * radialFactor + sin(uv.x * 20.0 + uTime * uFlowSpeed) * 0.02 * uFlowAmplitude * radialFactor;
       
       vec4 viewPosition = modelViewMatrix * vec4(pos, 1.0);
       gl_Position = projectionMatrix * viewPosition;
