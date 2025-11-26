@@ -7,6 +7,7 @@ import HeartPopup from '@/components/ui/HeartPopup';
 import Timeline from '@/components/ui/Timeline';
 import { supabase } from '@/lib/supabaseClient';
 import { useMemoryStore } from '@/store/memoryStore';
+import { useImagePreload } from '@/hooks/useImagePreload';
 import { Loader2, Edit2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -20,6 +21,9 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [direction, setDirection] = useState(0); // -1 for prev, 1 for next
   const [isHeartPopupOpen, setIsHeartPopupOpen] = useState(true);
+
+  // Image preloading hook for smooth transitions
+  const { isImageLoaded, preloadImage } = useImagePreload(memories, activeMemoryId);
 
   // Load memories from database on mount
   useEffect(() => {
@@ -264,20 +268,20 @@ export default function Home() {
 
       {/* Main Content Container */}
       <div className="absolute inset-0 w-full h-full overflow-hidden flex flex-col items-center justify-center px-6">
-        <AnimatePresence mode="wait" custom={direction}>
+        <AnimatePresence initial={false} custom={direction}>
           {activeMemory ? (
             <motion.div
               key={activeMemory.id}
               custom={direction}
-              initial={{ opacity: 0, x: direction > 0 ? 300 : -300 }}
+              initial={{ opacity: 0, x: direction > 0 ? 150 : -150 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: direction > 0 ? -300 : 300 }}
-              transition={{ duration: 0.5, ease: 'easeInOut' }}
-              className="flex flex-col items-center justify-center max-w-7xl w-full h-full pt-32 md:pt-28 pb-48"
+              exit={{ opacity: 0, x: direction > 0 ? -150 : 150 }}
+              transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+              className="flex flex-col items-center justify-center max-w-7xl w-full h-full pt-32 md:pt-28 pb-32 absolute"
             >
               {/* Main Image with Drag Support */}
               <motion.div 
-                className="w-[80vw] h-[60vh] aspect-square flex items-center justify-center mb-6 cursor-grab active:cursor-grabbing mx-auto"
+                className="w-[80vw] h-[60vh] aspect-square flex items-center justify-center mb-2 cursor-grab active:cursor-grabbing mx-auto"
                 drag="x"
                 dragConstraints={{ left: 0, right: 0 }}
                 dragElastic={0.2}
@@ -286,16 +290,16 @@ export default function Home() {
                 <motion.img
                   src={activeMemory.imageUrl}
                   alt={activeMemory.title}
-                  initial={{ opacity: 0, scale: 1.05 }}
+                  initial={{ opacity: 0, scale: 1.02 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.6, ease: 'easeInOut' }}
+                  exit={{ opacity: 0, scale: 0.98 }}
+                  transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
                   className="w-full h-full object-cover pointer-events-none drop-shadow-2xl rounded-lg"
                 />
               </motion.div>
 
               {/* Description below image */}
-              <div className="text-center max-w-2xl mt-4 mb-4 shrink-0 px-4">
+              <div className="text-center max-w-2xl mt-2 mb-2 shrink-0 px-4">
                 <p className="text-sm md:text-base text-white/70 font-light leading-relaxed line-clamp-3">
                   {activeMemory.description}
                 </p>
@@ -320,7 +324,7 @@ export default function Home() {
 
       {/* Bottom Date Timeline */}
       {memories.length > 1 && (
-        <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black via-black/90 to-transparent pt-20 pb-4">
+        <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black via-black/90 to-transparent pt-12 pb-4">
           <Timeline 
             memories={memories}
             activeMemoryId={activeMemoryId}
@@ -329,6 +333,10 @@ export default function Home() {
               const currentIndex = memories.findIndex(m => m.id === activeMemoryId);
               setDirection(index > currentIndex ? 1 : -1);
               setActiveMemory(id);
+            }}
+            onMemoryHover={(imageUrl) => {
+              // Preload image on hover for even smoother transitions
+              preloadImage(imageUrl);
             }}
           />
         </div>
