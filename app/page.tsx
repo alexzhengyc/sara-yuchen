@@ -4,9 +4,10 @@ import { useState, useRef, useEffect } from 'react';
 import Layout from '@/components/ui/Layout';
 import UploadModal from '@/components/ui/UploadModal';
 import HeartPopup from '@/components/ui/HeartPopup';
+import Timeline from '@/components/ui/Timeline';
 import { supabase } from '@/lib/supabaseClient';
 import { useMemoryStore } from '@/store/memoryStore';
-import { ChevronLeft, ChevronRight, Loader2, Edit2 } from 'lucide-react';
+import { Loader2, Edit2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Home() {
@@ -18,7 +19,6 @@ export default function Home() {
   const [imagePreview, setImagePreview] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [direction, setDirection] = useState(0); // -1 for prev, 1 for next
-  const timelineRef = useRef<HTMLDivElement>(null);
   const [isHeartPopupOpen, setIsHeartPopupOpen] = useState(true);
 
   // Load memories from database on mount
@@ -219,22 +219,6 @@ export default function Home() {
     }
   };
 
-  // Auto-scroll timeline to center active thumbnail
-  useEffect(() => {
-    if (timelineRef.current && memories.length > 1) {
-      const timeline = timelineRef.current;
-      const activeIndex = currentIndex;
-      // Each thumbnail is approximately 64px (16 * 4) + 16px gap = 80px
-      const thumbnailWidth = 80;
-      const scrollPosition = activeIndex * thumbnailWidth - (timeline.clientWidth / 2) + (thumbnailWidth / 2);
-      
-      timeline.scrollTo({
-        left: scrollPosition,
-        behavior: 'smooth',
-      });
-    }
-  }, [activeMemoryId, currentIndex, memories.length]);
-
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -289,34 +273,11 @@ export default function Home() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: direction > 0 ? -300 : 300 }}
               transition={{ duration: 0.5, ease: 'easeInOut' }}
-              className="flex flex-col items-center justify-center max-w-7xl w-full"
+              className="flex flex-col items-center justify-center max-w-7xl w-full h-full pt-32 md:pt-28 pb-48"
             >
-              {/* Date and Title above image */}
-              <div className="text-center mb-6 relative group">
-                <p className="text-xs text-white/50 mb-2 tracking-wider">
-                  {new Date(activeMemory.date).toLocaleDateString('en-US', { 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                  })}
-                </p>
-                <div className="flex items-center justify-center gap-3">
-                  <h2 className="text-3xl md:text-4xl font-thin tracking-tight text-white">
-                    {activeMemory.title}
-                  </h2>
-                  <button
-                    onClick={handleEditTrigger}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-2 hover:bg-white/10 rounded-full"
-                    aria-label="Edit memory"
-                  >
-                    <Edit2 className="w-5 h-5 text-white/70 hover:text-white" />
-                  </button>
-                </div>
-              </div>
-
               {/* Main Image with Drag Support */}
               <motion.div 
-                className="w-full flex justify-center mb-6 cursor-grab active:cursor-grabbing"
+                className="w-[80vw] h-[60vh] aspect-square flex items-center justify-center mb-6 cursor-grab active:cursor-grabbing mx-auto"
                 drag="x"
                 dragConstraints={{ left: 0, right: 0 }}
                 dragElastic={0.2}
@@ -329,64 +290,16 @@ export default function Home() {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.6, ease: 'easeInOut' }}
-                  className="h-[60vh] w-auto object-contain pointer-events-none"
+                  className="w-full h-full object-cover pointer-events-none drop-shadow-2xl rounded-lg"
                 />
               </motion.div>
 
               {/* Description below image */}
-              <div className="text-center max-w-2xl mb-8">
-                <p className="text-sm md:text-base text-white/70 font-light leading-relaxed">
+              <div className="text-center max-w-2xl mt-4 mb-4 shrink-0 px-4">
+                <p className="text-sm md:text-base text-white/70 font-light leading-relaxed line-clamp-3">
                   {activeMemory.description}
                 </p>
               </div>
-
-              {/* Timeline Thumbnails */}
-              {memories.length > 1 && (
-                <div className="w-full max-w-6xl">
-                  <div 
-                    ref={timelineRef}
-                    className="flex justify-center gap-4 overflow-x-auto pb-4 px-4 scrollbar-hide"
-                    style={{
-                      scrollbarWidth: 'none',
-                      msOverflowStyle: 'none',
-                    }}
-                  >
-                    {memories.map((memory, index) => (
-                      <motion.div
-                        key={memory.id}
-                        className={`shrink-0 cursor-pointer transition-all duration-300 ${
-                          memory.id === activeMemory.id ? 'scale-110' : 'scale-100 opacity-60 hover:opacity-100'
-                        }`}
-                        onClick={() => {
-                          setDirection(index > currentIndex ? 1 : -1);
-                          setActiveMemory(memory.id);
-                        }}
-                        whileHover={{ scale: memory.id === activeMemory.id ? 1.1 : 1.05 }}
-                      >
-                        <div className="relative">
-                          <img
-                            src={memory.imageUrl}
-                            alt={memory.title}
-                            className={`h-16 w-16 object-cover rounded-lg ${
-                              memory.id === activeMemory.id 
-                                ? 'ring-2 ring-white shadow-lg shadow-white/20' 
-                                : 'ring-1 ring-white/20'
-                            }`}
-                          />
-                          <div className="mt-1 text-center">
-                            <p className="text-xs text-white/50 truncate w-16">
-                              {new Date(memory.date).toLocaleDateString('en-US', { 
-                                month: 'short', 
-                                day: 'numeric' 
-                              })}
-                            </p>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </motion.div>
           ) : (
             <motion.div 
@@ -405,29 +318,25 @@ export default function Home() {
         </AnimatePresence>
       </div>
 
+      {/* Bottom Date Timeline */}
+      {memories.length > 1 && (
+        <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black via-black/90 to-transparent pt-20 pb-4">
+          <Timeline 
+            memories={memories}
+            activeMemoryId={activeMemoryId}
+            onChange={(id) => {
+              const index = memories.findIndex(m => m.id === id);
+              const currentIndex = memories.findIndex(m => m.id === activeMemoryId);
+              setDirection(index > currentIndex ? 1 : -1);
+              setActiveMemory(id);
+            }}
+          />
+        </div>
+      )}
+
       {/* UI Overlays */}
       <div className="absolute inset-0 pointer-events-none z-10">
-
-        {/* Navigation Arrows */}
-        {memories.length > 1 && (
-            <div className="absolute top-1/2 left-0 right-0 flex justify-between px-4 pointer-events-auto -translate-y-1/2">
-                <button 
-                    onClick={handlePrev}
-                    disabled={currentIndex === 0}
-                    className="p-2 rounded-full bg-black/20 backdrop-blur hover:bg-white/10 disabled:opacity-20 transition-all"
-                >
-                    <ChevronLeft className="text-white" />
-                </button>
-                <button 
-                    onClick={handleNext}
-                    disabled={currentIndex === memories.length - 1}
-                    className="p-2 rounded-full bg-black/20 backdrop-blur hover:bg-white/10 disabled:opacity-20 transition-all"
-                >
-                    <ChevronRight className="text-white" />
-                </button>
-            </div>
-        )}
-
+        {/* Navigation Arrows removed */}
       </div>
 
       {/* Loading Overlay */}

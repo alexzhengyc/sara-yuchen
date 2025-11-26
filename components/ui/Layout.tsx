@@ -16,7 +16,7 @@ export default function Layout({
       <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-6 pointer-events-none">
         <div className="pointer-events-auto">
           <h1 className="text-lg font-light tracking-widest uppercase opacity-90">
-            Sara & Yuchen's Secret Space
+            S & Y's Memory Garden
           </h1>
         </div>
 
@@ -27,7 +27,7 @@ export default function Layout({
             aria-label="Upload picture"
           >
             <ImageIcon size={16} />
-            <span className="text-xs uppercase tracking-wider">Upload Memory</span>
+            <span className="text-xs uppercase tracking-wider">Upload</span>
           </button>
         </div>
       </header>
