@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Layout from '@/components/ui/Layout';
 import UploadModal from '@/components/ui/UploadModal';
+import HeartPopup from '@/components/ui/HeartPopup';
 import { supabase } from '@/lib/supabaseClient';
 import { useMemoryStore } from '@/store/memoryStore';
 import { ChevronLeft, ChevronRight, Loader2, Edit2 } from 'lucide-react';
@@ -18,6 +19,7 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [direction, setDirection] = useState(0); // -1 for prev, 1 for next
   const timelineRef = useRef<HTMLDivElement>(null);
+  const [isHeartPopupOpen, setIsHeartPopupOpen] = useState(true);
 
   // Load memories from database on mount
   useEffect(() => {
@@ -253,6 +255,12 @@ export default function Home() {
         onChange={handleFileChange}
         accept="image/*"
         className="hidden"
+      />
+
+      {/* Heart Popup */}
+      <HeartPopup 
+        isOpen={isHeartPopupOpen}
+        onClose={() => setIsHeartPopupOpen(false)}
       />
 
       {/* Upload Modal */}
